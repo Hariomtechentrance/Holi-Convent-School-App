@@ -5,7 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Image,
+  ImageBackground,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,14 +14,17 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Ionicons';
 import AuthService from '../services/AuthService';
-import { Colors, FontSizes, Spacing, BorderRadius, CommonStyles } from '../styles/CommonStyles';
+import { Colors, FontSizes, Spacing } from '../styles/CommonStyles';
 
 const LoginScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [focusedInput, setFocusedInput] = useState(null);
 
   const validateForm = () => {
     const newErrors = {};
@@ -69,14 +72,19 @@ const LoginScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4A90E2" />
-      <KeyboardAvoidingView
-        style={styles.keyboardContainer}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <ImageBackground
+        source={require('../assets/back_image.jpg')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          style={styles.keyboardContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            showsVerticalScrollIndicator={false}
+          >
           {/* Main Content */}
           <View style={styles.mainContent}>
             {/* Header Text */}
@@ -93,10 +101,11 @@ const LoginScreen = ({ navigation }) => {
                 <TextInput
                   style={[
                     styles.input,
-                    errors.username && styles.inputError
+                    errors.username && styles.inputError,
+                    focusedInput === 'username' && styles.inputFocus
                   ]}
                   placeholder="Enter User ID (eg cv786756)"
-                  placeholderTextColor="#999999"
+                  placeholderTextColor="#9CA3AF"
                   value={username}
                   onChangeText={(text) => {
                     setUsername(text);
@@ -104,6 +113,8 @@ const LoginScreen = ({ navigation }) => {
                       setErrors(prev => ({ ...prev, username: null }));
                     }
                   }}
+                  onFocus={() => setFocusedInput('username')}
+                  onBlur={() => setFocusedInput(null)}
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!loading}
@@ -115,14 +126,15 @@ const LoginScreen = ({ navigation }) => {
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <View style={styles.passwordContainer}>
+                <View style={[
+                  styles.passwordContainer,
+                  errors.password && styles.inputError,
+                  focusedInput === 'password' && styles.inputFocus
+                ]}>
                   <TextInput
-                    style={[
-                      styles.passwordInput,
-                      errors.password && styles.inputError
-                    ]}
+                    style={styles.passwordInput}
                     placeholder="Enter Password"
-                    placeholderTextColor="#999999"
+                    placeholderTextColor="#9CA3AF"
                     value={password}
                     onChangeText={(text) => {
                       setPassword(text);
@@ -130,13 +142,25 @@ const LoginScreen = ({ navigation }) => {
                         setErrors(prev => ({ ...prev, password: null }));
                       }
                     }}
-                    secureTextEntry
+                    onFocus={() => setFocusedInput('password')}
+                    onBlur={() => setFocusedInput(null)}
+                    secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
                     editable={!loading}
                   />
-                  <TouchableOpacity style={styles.eyeIcon}>
-                    <Text style={styles.eyeIconText}>👁</Text>
+                  <TouchableOpacity
+                    style={styles.eyeIcon}
+                    onPress={() => setShowPassword(!showPassword)}
+                    activeOpacity={0.6}
+                    accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                    accessibilityRole="button"
+                  >
+                    <Icon
+                      name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                      size={24}
+                      color={focusedInput === 'password' ? Colors.primary : '#6B7280'}
+                    />
                   </TouchableOpacity>
                 </View>
                 {errors.password && (
@@ -163,8 +187,9 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.loginButtonText}>LOGIN</Text>
             )}
           </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </ImageBackground>
     </SafeAreaView>
   );
 };
@@ -172,7 +197,9 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#4A90E2', // Blue gradient background
+  },
+  backgroundImage: {
+    flex: 1,
   },
   keyboardContainer: {
     flex: 1,
@@ -191,55 +218,61 @@ const styles = StyleSheet.create({
     color: Colors.white,
     textAlign: 'center',
     marginBottom: 60,
-    lineHeight: 24,
+    lineHeight: 26,
+    fontWeight: '500',
+    letterSpacing: 0.5,
   },
   formContainer: {
     backgroundColor: Colors.white,
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    marginHorizontal: 10,
-    elevation: 4,
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    marginHorizontal: 16,
+    elevation: 8,
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   inputContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   input: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#CCCCCC',
-    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: '#E5E7EB',
+    paddingVertical: 14,
     paddingHorizontal: 0,
     fontSize: 16,
     color: Colors.text,
     backgroundColor: 'transparent',
+    fontWeight: '400',
   },
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#CCCCCC',
+    borderBottomWidth: 2,
+    borderBottomColor: '#E5E7EB',
   },
   passwordInput: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 0,
     fontSize: 16,
     color: Colors.text,
     backgroundColor: 'transparent',
+    fontWeight: '400',
   },
   eyeIcon: {
-    padding: 8,
-  },
-  eyeIconText: {
-    fontSize: 18,
-    color: '#999999',
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputError: {
     borderBottomColor: Colors.error,
+    borderBottomWidth: 2,
+  },
+  inputFocus: {
+    borderBottomColor: Colors.primary,
     borderBottomWidth: 2,
   },
   errorText: {
@@ -249,26 +282,28 @@ const styles = StyleSheet.create({
   },
   forgotPasswordContainer: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 24,
   },
   forgotPasswordText: {
     color: '#F59E0B', // Yellow color as shown in image
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   loginButton: {
     backgroundColor: '#4CAF50', // Green color as shown in image
-    paddingVertical: 16,
+    paddingVertical: 18,
     marginHorizontal: 20,
     marginBottom: 30,
     borderRadius: 0, // No border radius as shown in image
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
+    elevation: 4,
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    minHeight: 56,
   },
   loginButtonDisabled: {
     opacity: 0.7,
@@ -277,7 +312,8 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 18,
     fontWeight: 'bold',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
 });
 

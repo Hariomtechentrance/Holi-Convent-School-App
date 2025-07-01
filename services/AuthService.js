@@ -59,10 +59,15 @@ class AuthService {
       console.log('API Response:', data);
 
       // Check if login was successful
-      if (data.loginStatus === 'success' && data.ResponseCode === '200') {
+      if (data.loginStatus === 'success') {
         return {
           success: true,
-          data: data,
+          data: {
+            ...data,
+            // Preserve original credentials for future API calls
+            originalUserName: username.trim(),
+            originalPassword: password.trim()
+          },
           message: data.resultMsg || "Login successful"
         };
       } else {

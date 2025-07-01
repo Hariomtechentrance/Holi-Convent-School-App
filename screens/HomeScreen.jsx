@@ -1,477 +1,476 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  StatusBar,
-  Image,
-  ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, FontSizes, Spacing, BorderRadius, CommonStyles } from '../styles/CommonStyles';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, UIManager, Platform } from 'react-native';
+import ContentDisplaySection from '../components/ContentDisplay/ContentDisplaySection';
 
-const HomeScreen = ({ navigation, route }) => {
-  const { userData } = route.params || {};
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const topMenu = [
+  {
+    label: 'ALERT',
+    image: require('../assets/icc_alert.png')
+  },
+  {
+    label: 'CIRCULAR',
+    image: require('../assets/icc_acedemics.png')
+  },
+  {
+    label: 'HOMEWORK',
+    image: require('../assets/icc_assignment.png')
+  },
+  {
+    label: 'MOMENTS',
+    image: require('../assets/icc_photos.png')
+  },
+];
+
+const bottomMenu = [
+  {
+    label: 'Profile',
+    image: require('../assets/ic_profile.png'),
+    action: 'profile'
+  },
+  {
+    label: 'Pay Fees',
+    image: require('../assets/icc_fees.png')
+  },
+  {
+    label: 'Attendance',
+    image: require('../assets/icc_attendance.png')
+  },
+  {
+    label: 'Website',
+    image: require('../assets/icc_website.png')
+  },
+  {
+    label: 'Contact Us',
+    image: require('../assets/icc_contact.png')
+  },
+  {
+    label: 'Performance',
+    image: require('../assets/ic_progress_report.png')
+  },
+];
+
+const HomeScreen = ({ route, navigation }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const rotateAnim = useState(new Animated.Value(expanded ? 1 : 0))[0];
+  const slideAnim = useState(new Animated.Value(expanded ? 1 : 0))[0];
+  const menuAnim = useState(new Animated.Value(1))[0]; // 1 = visible, 0 = hidden
+  const lastScrollY = useRef(0);
+  const scrollDirection = useRef('down');
+  const animationTimeout = useRef(null);
+
+  // Get user data from navigation params
+  const userData = route?.params?.userData || {};
+
+  // Extract student information from API response
+  const studentName = userData.studentName || 'Student Name';
+  const className = userData.className || 'Class';
+  const divisionName = userData.divisionName || '';
+  const gender = userData.gender || 'MALE';
+  const profilePhoto = userData.profilePhoto || '';
+  const schoolName = userData.schoolName || 'HOLY CROSS CONVENT SCHOOL';
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (animationTimeout.current) {
+        clearTimeout(animationTimeout.current);
+      }
+    };
+  }, []);
+
+  // Determine student image source
+  const getStudentImage = () => {
+    if (profilePhoto && profilePhoto.trim() !== '') {
+      return { uri: profilePhoto };
+    }
+    // Use gender-based placeholder
+    return gender.toUpperCase() === 'FEMALE'
+      ? require('../assets/female-placeholder.png')
+      : require('../assets/male-placeholder.png');
+  };
+
+  const toggleExpanded = () => {
+    setExpanded(!expanded);
+
+    // Animate arrow rotation
+    Animated.timing(rotateAnim, {
+      toValue: expanded ? 0 : 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Animate bottom grid slide
+    Animated.timing(slideAnim, {
+      toValue: expanded ? 0 : 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleScroll = (event) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    const scrollDiff = currentScrollY - lastScrollY.current;
+
+    // Only trigger animation if scroll difference is significant (> 5px)
+    if (Math.abs(scrollDiff) > 10) {
+      const isScrollingUp = scrollDiff < 0;
+      const newDirection = isScrollingUp ? 'up' : 'down';
+
+      // Only animate if direction changed or if we're at the top
+      if (scrollDirection.current !== newDirection || currentScrollY <= 0) {
+        scrollDirection.current = newDirection;
+
+        const shouldShowMenu = isScrollingUp || currentScrollY <= 0;
+
+        // Clear any existing timeout
+        if (animationTimeout.current) {
+          clearTimeout(animationTimeout.current);
+        }
+
+        // Add slight delay to prevent too frequent animations
+        animationTimeout.current = setTimeout(() => {
+          // Animate menu visibility
+          Animated.timing(menuAnim, {
+            toValue: shouldShowMenu ? 1 : 0,
+            duration: 200,
+            useNativeDriver: false,
+          }).start();
+        }, 50);
+      }
+    }
+
+    lastScrollY.current = currentScrollY;
+  };
+
+  const handleMenuPress = (item) => {
+    if (item.action === 'profile') {
+      navigation.navigate('Profile', { userData });
+      return;
+    }
+
+    // Handle top menu filter actions
+    const filterMap = {
+      'ALERT': 'alerts',
+      'CIRCULAR': 'circulars',
+      'HOMEWORK': 'homework',
+      'MOMENTS': 'moments'
+    };
+
+    if (filterMap[item.label]) {
+      // If the same filter is clicked again, show all content
+      if (activeFilter === filterMap[item.label]) {
+        setActiveFilter('all');
+      } else {
+        setActiveFilter(filterMap[item.label]);
+      }
+    }
+
+    // Add other navigation actions here as needed
+  };
 
   const handleProfilePress = () => {
     navigation.navigate('Profile', { userData });
   };
 
-  const handleLogout = () => {
-    navigation.replace('Login');
-  };
-
-  // Navigation items data - using exact icons and colors from the image
-  const navigationItems = [
-    { id: 'alert', title: 'ALERT', icon: '🔔', color: '#FF5252', bgColor: '#FFEBEE' },
-    { id: 'circular', title: 'CIRCULAR', icon: '📄', color: '#FFC107', bgColor: '#FFF8E1' },
-    { id: 'homework', title: 'HOMEWORK', icon: '📝', color: '#FF9800', bgColor: '#FFF3E0' },
-    { id: 'moments', title: 'MOMENTS', icon: '📷', color: '#E91E63', bgColor: '#FCE4EC' },
-    { id: 'profile', title: 'Profile', icon: '👤', color: '#2196F3', bgColor: '#E3F2FD' },
-    { id: 'fees', title: 'Pay Fees', icon: '₹', color: '#4CAF50', bgColor: '#E8F5E8' },
-    { id: 'attendance', title: 'Attendance', icon: '📅', color: '#9C27B0', bgColor: '#F3E5F5' },
-    { id: 'website', title: 'Website', icon: '🌐', color: '#00BCD4', bgColor: '#E0F2F1' },
-    { id: 'contact', title: 'Contact Us', icon: '📞', color: '#607D8B', bgColor: '#ECEFF1' },
-    { id: 'performance', title: 'Performance', icon: '📊', color: '#FF9800', bgColor: '#FFF3E0' },
-  ];
-
-  // Get moments data from API response
-  const momentsData = userData?.LIST?.filter(item => item.type === 'circular' || item.type === 'alert') || [];
-
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#4A90E2" />
-
-      {/* Header Section */}
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        {/* Top Row with School Logo and Profile */}
-        <View style={styles.topRow}>
-          <View style={styles.schoolInfo}>
-            {userData?.schoolLogo ? (
-              <Image
-                source={{ uri: userData.schoolLogo }}
-                style={styles.schoolLogo}
-              />
-            ) : (
-              <View style={styles.logoPlaceholder}>
-                <Text style={styles.logoText}>HCCS</Text>
-              </View>
-            )}
-            <View style={styles.schoolDetails}>
-              <Text style={styles.schoolName} numberOfLines={2}>
-                {userData?.schoolName || 'HOLY CROSS CONVENT SCHOOL'}
-              </Text>
-              <Text style={styles.schoolSubtext}>[ ICSE SECTION ]</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={handleProfilePress}
-          >
-            <View style={styles.profileAvatar}>
-              {userData?.profilePhoto ? (
-                <Image
-                  source={{ uri: userData.profilePhoto }}
-                  style={styles.profileImage}
-                />
-              ) : (
-                <Text style={styles.profileInitial}>
-                  {userData?.studentName?.charAt(0) || 'D'}
-                </Text>
-              )}
-            </View>
-            <Text style={styles.menuDots}>⋮</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Student Info Banner */}
-        <View style={styles.studentBanner}>
-          <Text style={styles.studentNameBanner}>
-            {userData?.studentName?.toUpperCase() || 'DHWANI'}
-          </Text>
-          <Text style={styles.classInfoBanner}>
-            {userData?.className || 'VII'} {userData?.divisionName || 'B'}
-          </Text>
+        <Image source={require('../assets/icse-logo.png')} style={styles.logo} />
+        <View style={styles.schoolNameContainer}>
+          <Text style={styles.schoolName}>{schoolName.toUpperCase()}</Text>
         </View>
       </View>
 
-      {/* Navigation Grid */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.navigationGrid}>
-          {navigationItems.slice(0, 8).map((item, index) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.navItem}
-              onPress={() => {
-                if (item.id === 'profile') {
-                  handleProfilePress();
-                } else {
-                  // Handle other navigation items
-                  console.log(`Navigate to ${item.title}`);
+      {/* Student Info */}
+      <View style={styles.studentInfo}>
+        <View style={styles.studentDetails}>
+          <Text style={styles.studentName}>{studentName.toUpperCase()}</Text>
+          <Text style={styles.studentClass}>{className} {divisionName}</Text>
+        </View>
+        <TouchableOpacity onPress={handleProfilePress}>
+          <Image source={getStudentImage()} style={styles.studentImage} />
+        </TouchableOpacity>
+                <TouchableOpacity style={styles.menuDots}>
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Navigation Menu Container */}
+      <Animated.View
+        style={[
+          styles.navigationContainer,
+          {
+            maxHeight: menuAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 300], // Adjust based on your menu height
+            }),
+            opacity: menuAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 1],
+            }),
+            transform: [{
+              translateY: menuAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-50, 0],
+              })
+            }]
+          }
+        ]}
+      >
+        {/* Top Menu */}
+        <View style={styles.topGrid}>
+          {topMenu.map((item, index) => (
+            <TouchableOpacity key={index} style={styles.topIconButton} onPress={() => handleMenuPress(item)}>
+              <Image source={item.image} style={styles.iconImage} />
+              <Text style={styles.iconLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Toggle Button */}
+        <TouchableOpacity style={styles.toggleButton} onPress={toggleExpanded}>
+          <View style={styles.toggleContainer}>
+            <View style={styles.horizontalLine} />
+            <Animated.Image
+              source={require('../assets/arrow_up.png')}
+              style={[
+                styles.arrowImage,
+                {
+                  transform: [{
+                    rotate: rotateAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '180deg']
+                    })
+                  }]
                 }
-              }}
-            >
-              <View style={[styles.navIcon, { backgroundColor: item.bgColor }]}>
-                <Text style={[styles.navIconText, { color: item.color }]}>{item.icon}</Text>
-              </View>
-              <Text style={styles.navTitle}>{item.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Up Arrow */}
-        <View style={styles.upArrowContainer}>
-          <View style={styles.upArrow}>
-            <Text style={styles.upArrowText}>▲</Text>
+              ]}
+            />
+            <View style={styles.horizontalLine} />
           </View>
-        </View>
+        </TouchableOpacity>
 
-        {/* Bottom Row Navigation */}
-        <View style={styles.bottomNavigation}>
-          {navigationItems.slice(8).map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.bottomNavItem}
-              onPress={() => {
-                console.log(`Navigate to ${item.title}`);
-              }}
-            >
-              <View style={[styles.bottomNavIcon, { backgroundColor: item.bgColor }]}>
-                <Text style={[styles.navIconText, { color: item.color }]}>{item.icon}</Text>
-              </View>
-              <Text style={styles.bottomNavTitle}>{item.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Bottom Menu */}
+        <Animated.View
+          style={[
+            styles.bottomGridContainer,
+            {
+              maxHeight: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 200],
+              }),
+              transform: [{
+                translateY: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-20, 0],
+                })
+              }]
+            }
+          ]}
+        >
+          <View style={styles.bottomGrid}>
+            {bottomMenu.map((item, index) => (
+              <TouchableOpacity key={index} style={styles.bottomIconButton} onPress={() => handleMenuPress(item)}>
+                <Image source={item.image} style={styles.iconImage} />
+                <Text style={styles.iconLabel}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Animated.View>
+      </Animated.View>
 
-        {/* Moments Section - Using Real API Data */}
-        <View style={styles.momentsSection}>
-          {momentsData.slice(0, 2).map((moment, index) => (
-            <View key={moment.circularTransId || moment.alertTransId || index} style={styles.momentItem}>
-              <View style={styles.momentHeader}>
-                <Text style={styles.momentLabel}>
-                  {moment.type === 'circular' ? 'MOMENT' : 'MOMENT'}
-                </Text>
-                <Text style={styles.momentDate}>
-                  {moment.sentDate || moment.startDate}
-                </Text>
-                <TouchableOpacity style={styles.momentMenu}>
-                  <Text style={styles.momentMenuText}>📋</Text>
-                </TouchableOpacity>
-              </View>
-
-              {moment.subject && (
-                <Text style={styles.momentTitle}>{moment.subject}</Text>
-              )}
-
-              {moment.description && (
-                <Text style={styles.momentText}>{moment.description}</Text>
-              )}
-
-              {moment.alertMessage && (
-                <Text style={styles.momentText}>{moment.alertMessage}</Text>
-              )}
-
-              {moment.attachments && moment.attachments.length > 0 && (
-                <>
-                  <Text style={styles.attachmentText}>ATTACHMENT [{moment.attachments.length}]</Text>
-                  {moment.attachments[0].filePath && (
-                    <Image
-                      source={{ uri: moment.attachments[0].filePath }}
-                      style={styles.attachmentImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                </>
-              )}
-            </View>
-          ))}
-
-          {/* If no moments from API, show placeholder */}
-          {momentsData.length === 0 && (
-            <View style={styles.momentItem}>
-              <View style={styles.momentHeader}>
-                <Text style={styles.momentLabel}>MOMENT</Text>
-                <Text style={styles.momentDate}>No moments available</Text>
-              </View>
-              <Text style={styles.momentText}>No moments to display</Text>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      {/* Dynamic Content Display Section */}
+      <View style={styles.contentSection}>
+        <ContentDisplaySection
+          userData={userData}
+          activeFilter={activeFilter}
+          onScroll={handleScroll}
+        />
+      </View>
+    </View>
   );
 };
+
+export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F5F5F5',
+  },
+  contentSection: {
+    flex: 1,
+    marginTop: 8,
+  },
+  navigationContainer: {
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
   },
   header: {
-    backgroundColor: '#4A90E2',
-    paddingHorizontal: 16,
-    paddingBottom: 0,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  schoolInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 6,
+    paddingVertical: 16,
+    marginBottom: 0,
+  },
+  logo: {
+    width: 60,
+    height: 60,
+    resizeMode: 'contain',
+    marginRight: 4,
+  },
+  schoolNameContainer: {
     flex: 1,
-  },
-  schoolLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
-  },
-  logoPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: Colors.white,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  logoText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4A90E2',
-  },
-  schoolDetails: {
-    flex: 1,
   },
   schoolName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.white,
-    marginBottom: 2,
-  },
-  schoolSubtext: {
-    fontSize: 12,
-    color: Colors.white,
-    opacity: 0.9,
-  },
-  profileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  profileAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  profileInitial: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  menuDots: {
-    fontSize: 20,
-    color: Colors.white,
-    fontWeight: 'bold',
-  },
-  studentBanner: {
-    backgroundColor: '#FFB74D',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  studentNameBanner: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.white,
+    color: '#4A90E2',
+    textAlign: 'center',
   },
-  classInfoBanner: {
-    fontSize: 16,
+  schoolSection: {
+    fontSize: 14,
     fontWeight: 'bold',
-    color: Colors.white,
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
-  content: {
+  menuDots: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 24,
+    height: 24,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2,
+    backgroundColor: '#FFFFFF',
+    marginVertical: 2,
+  },
+  studentInfo: {
+    backgroundColor: '#E8C547',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    height: 45,
+    overflow: 'visible',
+    zIndex: 1,
+  },
+  studentDetails: {
     flex: 1,
-    backgroundColor: Colors.white,
   },
-  navigationGrid: {
+  studentName: {
+    fontSize: 15,
+    color: '#1a237e',
+    fontWeight: 'bold',
+  },
+  studentClass: {
+    fontSize: 13,
+    color: '#1a237e',
+    fontWeight: '600',
+  },
+  studentImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 45,
+    borderWidth: 2,
+    borderColor: '#2196F3',
+    backgroundColor: '#fff',
+    zIndex: 2,
+  },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  bottomGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    paddingVertical: 5,
+    backgroundColor: '#FFFFFF',
+  },
+  bottomGridContainer: {
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  topGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
   },
-  navItem: {
-    width: '25%',
+  iconButton: {
     alignItems: 'center',
     marginBottom: 25,
+    width: '45%',
   },
-  navIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    justifyContent: 'center',
+  bottomIconButton: {
     alignItems: 'center',
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    marginBottom: 25,
+    width: '22%',
   },
-  navIconText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  navTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'center',
-    lineHeight: 14,
-  },
-  upArrowContainer: {
+  topIconButton: {
     alignItems: 'center',
-    marginVertical: 10,
-  },
-  upArrow: {
-    width: 30,
-    height: 20,
-    backgroundColor: '#E3F2FD',
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2196F3',
-  },
-  upArrowText: {
-    fontSize: 12,
-    color: '#2196F3',
-    fontWeight: 'bold',
-  },
-  bottomNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 40,
-    marginBottom: 20,
-  },
-  bottomNavItem: {
-    alignItems: 'center',
-  },
-  bottomNavIcon: {
-    width: 45,
-    height: 45,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  bottomNavTitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'center',
-    lineHeight: 12,
-  },
-  momentsSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  momentItem: {
-    backgroundColor: Colors.white,
-    borderRadius: 0,
-    padding: 16,
-    marginBottom: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  momentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  momentLabel: {
-    backgroundColor: '#4CAF50',
-    color: Colors.white,
-    fontSize: 10,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  momentDate: {
-    fontSize: 12,
-    color: '#4CAF50',
     flex: 1,
-    textAlign: 'right',
-    marginRight: 10,
   },
-  momentMenu: {
-    padding: 4,
+  iconImage: {
+    width: 36,
+    height: 36,
+    resizeMode: 'contain',
   },
-  momentMenuText: {
-    fontSize: 16,
-    color: '#4CAF50',
-  },
-  momentText: {
-    fontSize: 14,
-    color: Colors.text,
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  momentTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  attachmentText: {
+  iconLabel: {
+    marginTop: 2,
+    textAlign: 'center',
     fontSize: 12,
-    color: '#666',
-    backgroundColor: '#F5F5F5',
-    padding: 8,
-    marginBottom: 8,
-    borderRadius: 4,
+    fontWeight: 'normal',
+    color: '#000000',
   },
-  attachmentImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  attachmentPlaceholder: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#E91E63',
-    borderRadius: 8,
-    justifyContent: 'center',
+  toggleButton: {
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  attachmentEmoji: {
-    fontSize: 40,
+  toggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+  },
+  horizontalLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 5,
+  },
+  arrowImage: {
+    width: 25,
+    height: 25,
+    resizeMode: 'contain',
+  },
+  toggleButtonContainer: {
+    borderWidth: 2,
+    borderColor: '#1976D2',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+    backgroundColor: '#fff',
   },
 });
-
-export default HomeScreen;
