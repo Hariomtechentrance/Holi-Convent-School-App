@@ -153,6 +153,11 @@ const HomeScreen = ({ route, navigation }) => {
       return;
     }
 
+    if (item.action === 'chat') {
+      navigation.navigate('ChatList', { studentInfo: userData });
+      return;
+    }
+
     // Handle top menu filter actions
     const filterMap = {
       'ALERT': 'alerts',
@@ -175,6 +180,10 @@ const HomeScreen = ({ route, navigation }) => {
 
   const handleProfilePress = () => {
     navigation.navigate('Profile', { userData });
+  };
+
+  const handleChatPress = () => {
+    navigation.navigate('ChatList', { studentInfo: userData });
   };
 
   return (
@@ -294,6 +303,11 @@ const HomeScreen = ({ route, navigation }) => {
           onScroll={handleScroll}
         />
       </View>
+
+      {/* Floating Chat Button */}
+      <TouchableOpacity style={styles.floatingChatButton} onPress={handleChatPress}>
+        <Image source={require('../assets/chat.png')} style={styles.chatIcon} />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -472,5 +486,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 5,
     backgroundColor: '#fff',
+  },
+  floatingChatButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.5,
+    shadowRadius: 4.65,
+    zIndex: 1000,
+  },
+  chatIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
 });

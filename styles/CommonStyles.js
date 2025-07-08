@@ -3,7 +3,7 @@ import { StyleSheet, Dimensions } from 'react-native';
 const { width, height } = Dimensions.get('window');
 
 export const Colors = {
-  primary: '#1E3A8A', // Deep blue
+  primary: '#2f8dd7', // Primary blue
   secondary: '#3B82F6', // Lighter blue
   accent: '#F59E0B', // Orange/amber
   background: '#F8FAFC', // Light gray background
