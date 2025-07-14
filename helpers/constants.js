@@ -30,6 +30,13 @@ export const NOTIFICATION_TYPES = {
 // Login constants
 export const LOGIN_CURRENTUSER = "currentUser";
 
+// Action constants for multi-user functionality
+// export const ACTION_LOGOUT = "logout";
+// export const ACTION_ADD_CHILD = "add_child";
+// export const ACTION_FILTER = "filter";
+// export const ACTION_REFRESH = "refresh";
+// export const ACTION_FILTER_WITH_REFRESH = "filter_with_refresh";
+
 // File types
 export const imageFileTypes = ["jpg", "jpeg", "bmp", "png", "gif", "webp", "tiff"];
 

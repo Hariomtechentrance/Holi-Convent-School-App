@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,14 +17,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AuthService from '../services/AuthService';
 import { Colors, FontSizes, Spacing } from '../styles/CommonStyles';
+import { ACTION_ADD_CHILD, ACTION_LOGOUT } from '../helpers/constants';
 
-const LoginScreen = ({ navigation }) => {
+const LoginScreen = ({ navigation, route }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
+
+  // Get route parameters for add child functionality
+  const routeParam = route?.params;
+  const isAddChild = routeParam?.loginAction === ACTION_ADD_CHILD;
 
   const validateForm = () => {
     const newErrors = {};
@@ -45,6 +50,91 @@ const LoginScreen = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Auto-login functionality
+  useEffect(() => {
+    if (routeParam && routeParam.loginAction) {
+      console.log("Login Action is:", routeParam.loginAction);
+
+      if (routeParam.loginAction === ACTION_ADD_CHILD) {
+        setUsername("");
+        setPassword("");
+        // Don't auto-login for add child
+      } else if (routeParam.loginAction === ACTION_LOGOUT) {
+        setUsername("");
+        setPassword("");
+        // Don't auto-login after logout - user must manually login
+        console.log("User logged out - manual login required");
+      } else if (routeParam.loginAction === 'USER_SWITCH' && routeParam.switchToUser) {
+        // Handle user switch - auto login with the switched user
+        handleUserSwitch(routeParam.switchToUser);
+      }
+    } else {
+      // Auto-login with last logged-in user if available
+      autoLogin();
+    }
+  }, []);
+
+  const autoLogin = async () => {
+    console.log("autoLogin started");
+    setLoading(true);
+
+    try {
+      const result = await AuthService.autoLogin();
+      if (result.success) {
+        console.log("Auto login successful for:", result.data.studentName);
+        navigation.replace('Home', {
+          userData: {
+            ...result.data,
+            isAutoLogin: true
+          }
+        });
+      } else {
+        console.log("No valid stored credentials for auto-login");
+        // Show login form for manual login
+      }
+    } catch (error) {
+      console.error("Auto login error:", error);
+      // Show login form for manual login
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUserSwitch = async (switchToUser) => {
+    console.log("Handling user switch to:", switchToUser.fullName);
+    setLoading(true);
+
+    try {
+      // Get the full user credentials from storage
+      const userCredentials = await AuthService.getStoredUsers();
+      if (userCredentials.success) {
+        const fullUserData = userCredentials.data.find(user => user.username === switchToUser.username);
+        if (fullUserData && fullUserData.password) {
+          // Validate login with the switched user's credentials
+          const result = await AuthService.validateLogin(fullUserData.username, fullUserData.password);
+          if (result.success) {
+            console.log("User switch login successful");
+            navigation.replace('Home', {
+              userData: {
+                ...result.data,
+                isSwitchedUser: true
+              }
+            });
+          } else {
+            Alert.alert('Error', 'Failed to switch user. Please try again.');
+          }
+        } else {
+          Alert.alert('Error', 'User credentials not found. Please login again.');
+        }
+      }
+    } catch (error) {
+      console.error("User switch error:", error);
+      Alert.alert('Error', 'Failed to switch user. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     if (!validateForm()) {
       return;
@@ -54,11 +144,34 @@ const LoginScreen = ({ navigation }) => {
     setErrors({});
 
     try {
-      const response = await AuthService.validateLogin(username, password);
+      const response = await AuthService.validateLogin(username, password, isAddChild);
 
       if (response.success) {
-        // Navigate to Home screen with user data
-        navigation.replace('Home', { userData: response.data });
+        if (isAddChild) {
+          // For add child, navigate to home with the new child's data
+          Alert.alert(
+            'Success',
+            'Child added successfully!',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Always navigate to Home with the new child's data
+                  // This ensures the HomeScreen has the correct current user info
+                  navigation.replace('Home', {
+                    userData: {
+                      ...response.data,
+                      isNewChild: true // Flag to indicate this is a newly added child
+                    }
+                  });
+                }
+              }
+            ]
+          );
+        } else {
+          // Regular login - navigate to Home screen
+          navigation.replace('Home', { userData: response.data });
+        }
       } else {
         Alert.alert('Login Failed', response.message);
       }
@@ -72,6 +185,17 @@ const LoginScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4A90E2" />
+
+      {/* Full Screen Loading Overlay */}
+      {loading && (
+        <View style={styles.fullScreenLoading}>
+          <ActivityIndicator size="large" color={Colors.white} />
+          <Text style={styles.loadingText}>
+            {isAddChild ? 'Adding Child...' : 'Logging in...'}
+          </Text>
+        </View>
+      )}
+
       <ImageBackground
         source={require('../assets/back_image.jpg')}
         style={styles.backgroundImage}
@@ -85,13 +209,30 @@ const LoginScreen = ({ navigation }) => {
             contentContainerStyle={styles.scrollContainer}
             showsVerticalScrollIndicator={false}
           >
+          {/* Back Button for Add Child */}
+          {isAddChild && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => {
+                if (routeParam?.canReturnHome) {
+                  navigation.goBack();
+                } else {
+                  autoLogin();
+                }
+              }}
+            >
+              <Icon name="arrow-back" size={24} color={Colors.white} />
+            </TouchableOpacity>
+          )}
+
           {/* Main Content */}
           <View style={styles.mainContent}>
             {/* Header Text */}
             <Text style={styles.headerText}>
-              Dear Parent, please enter the{'\n'}
-              UserID and Password received{'\n'}
-              from the School via Whatsapp
+              {isAddChild
+                ? 'Add Child Account\n\nEnter the UserID and Password\nfor the additional child'
+                : 'Dear Parent, please enter the\nUserID and Password received\nfrom the School via Whatsapp'
+              }
             </Text>
 
             {/* Login Form */}
@@ -181,11 +322,7 @@ const LoginScreen = ({ navigation }) => {
             onPress={handleLogin}
             disabled={loading}
           >
-            {loading ? (
-              <ActivityIndicator color={Colors.white} size="small" />
-            ) : (
-              <Text style={styles.loginButtonText}>LOGIN</Text>
-            )}
+            <Text style={styles.loginButtonText}>LOGIN</Text>
           </TouchableOpacity>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -197,6 +334,32 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  fullScreenLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: Colors.white,
+    fontSize: 16,
+    marginTop: 10,
+    fontWeight: '500',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    padding: 10,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   backgroundImage: {
     flex: 1,

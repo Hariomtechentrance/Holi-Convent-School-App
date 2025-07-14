@@ -1,7 +1,7 @@
 // Content Service for Holy Cross Convent School App
 // Handles fetching and processing of student content (alerts, circulars, homework, moments)
 
-const API_BASE_URL = 'http://pinnacleapp.in/SchoolConnect/rest/school/v1';
+const API_BASE_URL = 'https://pinnacleapp.in/SchoolConnect/rest/school/v1';
 
 // Helper function to get current date in required format
 const getCurrentDateTime = () => {
@@ -17,6 +17,120 @@ const getCurrentDateTime = () => {
 };
 
 class ContentService {
+  // Fetch content with pagination using correct offset logic
+  static async fetchStudentContentWithPagination(userName, password, offset = "0", limit = "10", filter = "All") {
+    try {
+      if (!userName || !password) {
+        throw new Error('User credentials not available');
+      }
+
+      // Convert page-based offset to item-based offset for API
+      // offset 0 = items 0-9, offset 1 = items 10-19, offset 2 = items 20-29, etc.
+      const pageNumber = parseInt(offset, 10);
+      const itemOffset = pageNumber * parseInt(limit, 10);
+
+      // Prepare API request payload with correct offset calculation
+      const requestPayload = {
+        albumId: "0",
+        appVersion: "1.0.17.1",
+        deviceKey: "eeP__0F0L0ljsd8BckIChp:APA91bEDSUr09XKBuXIT42bTSWO7dINeGZubxMXbR1xg7rC2jfFfAXQjGhNb-PXj9wuO9443r2a5Cd7yHKitht2oMqxbU29zHQHcTmt0i41EsqwWDKp21c4",
+        deviceType: "p_ios iPhone 15 Pro",
+        lastFetchDateFlag: "Y",
+        firstCall: offset === "0" ? "Y" : "N",
+        password: password,
+        source: "APP",
+        userName: userName,
+        lastFetchDate: getCurrentDateTime(),
+        offset: itemOffset.toString(), // Use calculated item offset for API
+        limit: limit
+      };
+
+      // Add filter if not 'All'
+      if (filter !== 'All') {
+        requestPayload.listType = filter;
+      }
+
+      console.log(`Fetching content - Page: ${offset}, Item Offset: ${itemOffset}, Limit: ${limit}, Filter: ${filter}`);
+
+      // Make API call with HTTPS/HTTP fallback
+      const data = await this.makeApiCall('validateLoginOptimized', requestPayload);
+
+      // Check if request was successful
+      if (data.loginStatus === 'success') {
+        return {
+          success: true,
+          data: data,
+          message: "Content fetched successfully"
+        };
+      } else {
+        return {
+          success: false,
+          data: null,
+          message: data.resultMsg || "Failed to fetch content"
+        };
+      }
+
+    } catch (error) {
+      console.error('Content API Error:', error);
+      return {
+        success: false,
+        data: null,
+        message: "Network error. Please check your internet connection and try again."
+      };
+    }
+  }
+
+  // API call helper with HTTPS/HTTP fallback
+  static async makeApiCall(endpoint, payload) {
+    const baseUrls = [
+      'https://pinnacleapp.in/SchoolConnect/rest/school/v1',
+      'http://pinnacleapp.in/SchoolConnect/rest/school/v1'
+    ];
+
+    for (let i = 0; i < baseUrls.length; i++) {
+      const baseUrl = baseUrls[i];
+      const fullUrl = `${baseUrl}/${endpoint}`;
+
+      try {
+        console.log(`Attempting API call to: ${fullUrl} (attempt ${i + 1})`);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+        const response = await fetch(fullUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        console.log(`Response status: ${response.status} from ${baseUrl}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('API Response successful from:', baseUrl);
+        return data;
+
+      } catch (error) {
+        console.log(`Failed to fetch from ${baseUrl}:`, error.message);
+
+        if (i === baseUrls.length - 1) {
+          // Last attempt failed
+          throw error;
+        }
+        // Continue to next URL
+      }
+    }
+  }
+
+  // Legacy method for backward compatibility
   static async fetchStudentContent(userData) {
     try {
       if (!userData) {
@@ -31,46 +145,20 @@ class ContentService {
         throw new Error('User credentials not available');
       }
 
-      // Prepare API request payload using stored user credentials
-      const requestPayload = {
-        albumId: "0",
-        appVersion: "1.0.17.1",
-        deviceKey: "eeP__0F0L0ljsd8BckIChp:APA91bEDSUr09XKBuXIT42bTSWO7dINeGZubxMXbR1xg7rC2jfFfAXQjGhNb-PXj9wuO9443r2a5Cd7yHKitht2oMqxbU29zHQHcTmt0i41EsqwWDKp21c4",
-        deviceType: "p_ios iPhone 15 Pro",
-        lastFetchDateFlag: "Y",
-        firstCall: "Y",
-        password: password,
-        source: "APP",
-        userName: userName,
-        lastFetchDate: "2025-06-10 07:46:49",
-        offset: "10",
-        limit: "50"
-      };
+      // Use the new pagination method with default values
+      const response = await this.fetchStudentContentWithPagination(userName, password, "0", "50", "All");
 
-      // Make API call
-      const response = await fetch(`${API_BASE_URL}/validateLoginOptimized`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(requestPayload),
-      });
-
-      const data = await response.json();
-
-      // Check if request was successful
-      if (data.loginStatus === 'success' && data.LIST) {
+      if (response.success && response.data && response.data.LIST) {
         return {
           success: true,
-          data: data.LIST,
-          message: "Content fetched successfully"
+          data: response.data.LIST,
+          message: response.message
         };
       } else {
         return {
           success: false,
           data: [],
-          message: data.resultMsg || "Failed to fetch content"
+          message: response.message
         };
       }
 

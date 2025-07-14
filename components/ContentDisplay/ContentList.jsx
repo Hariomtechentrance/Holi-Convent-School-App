@@ -85,14 +85,23 @@ const ContentList = ({
   };
 
   const keyExtractor = (item, index) => {
-    // Create unique key based on item type and ID
-    const id = item.albumId ||
-               item.alertTransId ||
-               item.circularTransId ||
-               item.classWorkTransId ||
-               item.messageID ||
-               index;
-    return `${item.type}-${id}`;
+    // Create unique key based on item type and multiple IDs to prevent duplicates
+    const primaryId = item.albumId ||
+                     item.alertTransId ||
+                     item.circularTransId ||
+                     item.classWorkTransId ||
+                     item.messageID ||
+                     item.id ||
+                     index;
+
+    // Add additional identifiers to make key more unique
+    const secondaryId = item.sentDate || item.startDate || item.createdDate || '';
+    const tertiaryId = item.title || item.subject || item.message || '';
+
+    // Create a hash-like unique key combining multiple properties
+    const uniqueKey = `${item.type}-${primaryId}-${secondaryId.replace(/[^0-9]/g, '')}-${tertiaryId.substring(0, 10).replace(/[^a-zA-Z0-9]/g, '')}-${index}`;
+
+    return uniqueKey;
   };
 
   return (

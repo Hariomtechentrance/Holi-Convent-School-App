@@ -23,6 +23,10 @@ const ChatScreen = ({ route, navigation }) => {
 
   const { data, roles, studentInfo } = route.params;
 
+  // Debug logging to check data structure
+  console.log('ChatScreen data:', data);
+  console.log('ChatScreen roles:', roles);
+
   const timeoutId = useRef(null);
   const listRef = useRef(null);
   const totalMessages = useRef(0);
@@ -38,6 +42,8 @@ const ChatScreen = ({ route, navigation }) => {
       if (messages.result) {
         setMessages(messages.result.detail || []);
         setHeaders(messages.result.header || null);
+        console.log('Chat headers received:', messages.result.header);
+        console.log('Chat messages received:', messages.result.detail);
       }
 
       timeoutId.current = setTimeout(() => {
@@ -118,10 +124,10 @@ const ChatScreen = ({ route, navigation }) => {
         ]}
       >
         <Text style={[styles.senderName, !isTeacher ? styles.userText : styles.teacherText]}>
-          {!isTeacher ? "You" : `${item.TECH_FIRST_NAME || ''} ${item.TECH_LAST_NAME || ''}`.trim()}
+          {!isTeacher ? "You" : `${item.TECH_FIRST_NAME || ''} ${item.TECH_LAST_NAME || ''}`.trim() || 'Teacher'}
         </Text>
         <Text style={[styles.messageText, !isTeacher ? styles.userText : styles.teacherText]}>
-          {item.MESSSGE || item.MESSAGE}
+          {item.MESSSGE || item.MESSAGE || item.CONTENT || 'No message content'}
         </Text>
         <Text style={[styles.timestampText, !isTeacher ? styles.userTimestamp : styles.teacherTimestamp]}>
           {dateFormatChat(item.CREATED_TIMESTAMP)}
@@ -136,9 +142,13 @@ const ChatScreen = ({ route, navigation }) => {
         <Text style={styles.toText}>To,</Text>
         <Text style={styles.dateText}>{dateFormatChat(data.CREATED_TIMESTAMP)}</Text>
       </View>
-      <Text style={styles.listItemSubject}>{data.ROLE_NAME}</Text>
+      <Text style={styles.listItemSubject}>
+        {data.ROLE_NAME || headers?.ROLE_NAME || 'Class Teacher'}
+      </Text>
       <Text style={styles.listItemSubject}>Message Subject:</Text>
-      <Text style={styles.messageText}>{data.MESSAGE_SUB}</Text>
+      <Text style={styles.messageText}>
+        {data.MESSAGE_SUB || headers?.MESSAGE_SUB || data.SUBJECT || 'No Subject'}
+      </Text>
     </View>
   );
 

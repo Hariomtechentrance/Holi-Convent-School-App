@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { PaperProvider } from 'react-native-paper';
 import FlashMessage from 'react-native-flash-message';
 
 // Import screens
@@ -15,6 +16,12 @@ import ChatList from './components/ChatList';
 import ChatScreen from './components/ChatScreen';
 import ChatCreate from './components/ChatCreate';
 
+// Import payment components
+import FeesHomeActivity from './components/fees/FeesHomeActivity';
+import ReceiptsActivity from './components/fees/ReceiptsActivity';
+import PaymentWebView from './components/PaymentWebView';
+import FeesDetailedList from './components/FeesDetailedList';
+
 // Import styles
 import { Colors } from './styles/CommonStyles';
 
@@ -22,8 +29,9 @@ const Stack = createStackNavigator();
 
 function App() {
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
+    <PaperProvider>
+      <SafeAreaProvider>
+        <NavigationContainer>
         <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
         <Stack.Navigator
           initialRouteName="Login"
@@ -113,10 +121,71 @@ function App() {
               },
             }}
           />
+          <Stack.Screen
+            name="Fees"
+            component={FeesHomeActivity}
+            options={{
+              title: 'Fees',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: Colors.primary,
+              },
+              headerTintColor: Colors.white,
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          />
+          <Stack.Screen
+            name="ViewReceipts"
+            component={ReceiptsActivity}
+            options={{
+              title: 'Payment Receipts',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: Colors.primary,
+              },
+              headerTintColor: Colors.white,
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          />
+          <Stack.Screen
+            name="WebView"
+            component={PaymentWebView}
+            options={{
+              title: 'Payment',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: Colors.primary,
+              },
+              headerTintColor: Colors.white,
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          />
+          <Stack.Screen
+            name="FeesDetailedList"
+            component={FeesDetailedList}
+            options={{
+              title: 'Fee Details',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: Colors.primary,
+              },
+              headerTintColor: Colors.white,
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }}
+          />
         </Stack.Navigator>
         <FlashMessage position="top" />
       </NavigationContainer>
     </SafeAreaProvider>
+    </PaperProvider>
   );
 }
 

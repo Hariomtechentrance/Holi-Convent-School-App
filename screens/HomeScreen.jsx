@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, UIManager, Platform } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Animated, UIManager, Platform, Alert, ActivityIndicator, ToastAndroid, Modal } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ContentDisplaySection from '../components/ContentDisplay/ContentDisplaySection';
+
+import MenuDots from '../components/MenuDots';
+import AuthService from '../services/AuthService';
+import { StorageHelper } from '../helpers/StorageHelper';
+import { ACTION_LOGOUT, ACTION_ADD_CHILD } from '../helpers/constants';
 
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -33,7 +39,8 @@ const bottomMenu = [
   },
   {
     label: 'Pay Fees',
-    image: require('../assets/icc_fees.png')
+    image: require('../assets/icc_fees.png'),
+    action: 'payFees'
   },
   {
     label: 'Attendance',
@@ -56,17 +63,23 @@ const bottomMenu = [
 const HomeScreen = ({ route, navigation }) => {
   const [expanded, setExpanded] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState(route?.params?.userData || {});
+  const [showSwitchUserDialog, setShowSwitchUserDialog] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
   const rotateAnim = useState(new Animated.Value(expanded ? 1 : 0))[0];
   const slideAnim = useState(new Animated.Value(expanded ? 1 : 0))[0];
   const menuAnim = useState(new Animated.Value(1))[0]; // 1 = visible, 0 = hidden
   const lastScrollY = useRef(0);
   const scrollDirection = useRef('down');
   const animationTimeout = useRef(null);
+  const backPressTimeout = useRef(null);
+  const contentDisplayRef = useRef(null);
 
-  // Get user data from navigation params
-  const userData = route?.params?.userData || {};
+  // Get user data from navigation params or current state
+  const userData = currentUserData;
 
-  // Extract student information from API response
+  // Extract student information from API response (updates when currentUserData changes)
   const studentName = userData.studentName || 'Student Name';
   const className = userData.className || 'Class';
   const divisionName = userData.divisionName || '';
@@ -74,14 +87,29 @@ const HomeScreen = ({ route, navigation }) => {
   const profilePhoto = userData.profilePhoto || '';
   const schoolName = userData.schoolName || 'HOLY CROSS CONVENT SCHOOL';
 
+  // Check if this is a newly added child
+  const isNewChild = userData.isNewChild || false;
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (animationTimeout.current) {
         clearTimeout(animationTimeout.current);
       }
+      if (backPressTimeout.current) {
+        clearTimeout(backPressTimeout.current);
+      }
     };
   }, []);
+
+  // Handle new child scenario
+  useEffect(() => {
+    if (isNewChild) {
+      console.log('New child detected, current user should be:', userData.username || userData.originalUserName);
+      // The user data is already correct from the login response
+      // This ensures the profile press will show other children correctly
+    }
+  }, [isNewChild, userData]);
 
   // Determine student image source
   const getStudentImage = () => {
@@ -158,6 +186,11 @@ const HomeScreen = ({ route, navigation }) => {
       return;
     }
 
+    if (item.action === 'payFees') {
+      handlePayFeesPress();
+      return;
+    }
+
     // Handle top menu filter actions
     const filterMap = {
       'ALERT': 'alerts',
@@ -178,12 +211,219 @@ const HomeScreen = ({ route, navigation }) => {
     // Add other navigation actions here as needed
   };
 
-  const handleProfilePress = () => {
-    navigation.navigate('Profile', { userData });
+  // Handle profile picture press for child switching
+  const handleProfilePicturePress = async () => {
+    try {
+      // Get all stored users
+      const result = await AuthService.getStoredUsers();
+      console.log('=== PROFILE PICTURE SWITCH DEBUG ===');
+      console.log('Total stored users:', result.data?.length || 0);
+      console.log('Stored users:', result.data?.map(u => ({ username: u.username, fullName: u.fullName })) || []);
+
+      if (!result.success || result.data.length <= 1) {
+        // No other children available
+        console.log('No other children available');
+        Alert.alert(
+          'Switch User',
+          'You dont have other child profile!',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Get current user from multiple sources for reliability
+      const currentUserFromRoute = userData?.username || userData?.originalUserName;
+      const currentUserFromStorage = await StorageHelper.getCurrentUserInfo();
+
+      console.log('Current user from route:', currentUserFromRoute);
+      console.log('Current user from storage:', currentUserFromStorage?.username);
+
+      // Use the most reliable current user identifier
+      const currentUserIdentifier = currentUserFromRoute || currentUserFromStorage?.username;
+      console.log('Using current user identifier:', currentUserIdentifier);
+
+      // Filter out the current user to show only other children
+      const otherUsers = result.data.filter(user => {
+        const isCurrentUser = user.username === currentUserIdentifier;
+        console.log(`User ${user.username} (${user.fullName}) is current user: ${isCurrentUser}`);
+        return !isCurrentUser;
+      });
+
+      console.log('Other users available for switching:', otherUsers.map(u => ({ username: u.username, fullName: u.fullName })));
+      console.log('=== END DEBUG ===');
+
+      if (otherUsers.length === 0) {
+        Alert.alert(
+          'Switch User',
+          'You dont have other child profile!',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Show custom dialog with available users for immediate switching
+      setAvailableUsers(otherUsers);
+      setShowSwitchUserDialog(true);
+    } catch (error) {
+      console.error('Error in handleProfilePicturePress:', error);
+      Alert.alert('Error', 'Failed to load user profiles');
+    }
   };
+
+
+
+  // Handle immediate student change following PinnacleSchool pattern
+  const handleStudentChanged = async (student) => {
+    try {
+      console.log('=== IMMEDIATE USER SWITCH DEBUG ===');
+      console.log('Switching to student:', student.fullName);
+
+      // Validate student data
+      if (!student || !student.username || !student.fullName) {
+        console.error('Invalid student data provided:', student);
+        Alert.alert('Error', 'Invalid student data. Please try again.');
+        return;
+      }
+
+      // Check if already switching
+      if (loading) {
+        console.log('Already switching users, ignoring request');
+        return;
+      }
+
+      setLoading(true);
+
+      // Switch user and get their data immediately
+      const switchResult = await AuthService.switchUserWithData(student);
+
+      if (switchResult.success) {
+        console.log('User switched successfully, updating UI');
+
+        // Validate the returned data
+        if (!switchResult.data || !switchResult.data.studentName) {
+          console.error('Invalid data returned from user switch:', switchResult.data);
+          Alert.alert('Error', 'Invalid user data received. Please try again.');
+          return;
+        }
+
+        // Update current user data state
+        setCurrentUserData(switchResult.data);
+
+        // Trigger content refresh for new user
+        if (contentDisplayRef.current) {
+          try {
+            await contentDisplayRef.current(switchResult.data);
+            console.log('Content refreshed for new user');
+          } catch (contentError) {
+            console.error('Error refreshing content:', contentError);
+            // Don't show error to user as the switch was successful
+          }
+        } else {
+          console.warn('Content display ref not available, content may not refresh');
+        }
+
+        console.log('UI updated for new user:', switchResult.data.studentName);
+
+        // Show success message
+        ToastAndroid.show(`Switched to ${switchResult.data.studentName}`, ToastAndroid.SHORT);
+
+      } else {
+        console.error('Failed to switch user:', switchResult.message);
+        Alert.alert(
+          'Switch Failed',
+          switchResult.message || 'Failed to switch user. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+
+    } catch (error) {
+      console.error('Error in handleStudentChanged:', error);
+      Alert.alert(
+        'Error',
+        'An unexpected error occurred while switching users. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+      console.log('=== END IMMEDIATE USER SWITCH DEBUG ===');
+    }
+  };
+
+
+
+
 
   const handleChatPress = () => {
     navigation.navigate('ChatList', { studentInfo: userData });
+  };
+
+
+
+  // Handle menu actions (logout, add child)
+  const handleActionTriggered = (action) => {
+    console.log('Action triggered:', action);
+    if (action === ACTION_LOGOUT) {
+      // Logout handled by MenuDots component
+    } else if (action === ACTION_ADD_CHILD) {
+      // Add child handled by MenuDots component
+    }
+  };
+
+  const handlePayFeesPress = async () => {
+    try {
+      // Check if payment terms have been accepted
+      const termsKey = `${userData.username}_payFeesTermsAccepted`;
+      const storedTerms = await AsyncStorage.getItem(termsKey);
+
+      if (storedTerms) {
+        const termsData = JSON.parse(storedTerms);
+        if (termsData.payFeesTermsAccepted === true) {
+          // Terms already accepted, navigate directly to fees
+          navigation.navigate('Fees', { studentInfo: userData });
+          return;
+        }
+      }
+
+      // Show terms and conditions dialog
+      Alert.alert(
+        'Payment Terms & Conditions',
+        'By proceeding with online payment, you agree to the terms and conditions of the payment gateway. The school is not responsible for any transaction failures or delays. Please ensure you have a stable internet connection before proceeding.',
+        [
+          {
+            text: 'Decline',
+            style: 'cancel',
+            onPress: async () => {
+              await AsyncStorage.setItem(termsKey, JSON.stringify({
+                payFeesTermsAccepted: false
+              }));
+            }
+          },
+          {
+            text: 'Accept & Continue',
+            onPress: async () => {
+              await AsyncStorage.setItem(termsKey, JSON.stringify({
+                payFeesTermsAccepted: true
+              }));
+              navigation.navigate('Fees', { studentInfo: userData });
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error handling payment terms:', error);
+      Alert.alert('Error', 'Failed to process payment terms. Please try again.');
+    }
+  };
+
+  // Handle user selection from custom dialog
+  const handleUserSelection = (user) => {
+    setShowSwitchUserDialog(false);
+    handleStudentChanged(user);
+  };
+
+  // Handle dialog cancel
+  const handleDialogCancel = () => {
+    setShowSwitchUserDialog(false);
   };
 
   return (
@@ -202,15 +442,13 @@ const HomeScreen = ({ route, navigation }) => {
           <Text style={styles.studentName}>{studentName.toUpperCase()}</Text>
           <Text style={styles.studentClass}>{className} {divisionName}</Text>
         </View>
-        <TouchableOpacity onPress={handleProfilePress}>
+        <TouchableOpacity onPress={handleProfilePicturePress}>
           <Image source={getStudentImage()} style={styles.studentImage} />
         </TouchableOpacity>
-                <TouchableOpacity style={styles.menuDots}>
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </TouchableOpacity>
+        <MenuDots navigation={navigation} onActionTriggered={handleActionTriggered} />
       </View>
+
+
 
       {/* Navigation Menu Container */}
       <Animated.View
@@ -301,6 +539,9 @@ const HomeScreen = ({ route, navigation }) => {
           userData={userData}
           activeFilter={activeFilter}
           onScroll={handleScroll}
+          onUserChanged={(handleUserChangeRef) => {
+            contentDisplayRef.current = handleUserChangeRef;
+          }}
         />
       </View>
 
@@ -308,6 +549,47 @@ const HomeScreen = ({ route, navigation }) => {
       <TouchableOpacity style={styles.floatingChatButton} onPress={handleChatPress}>
         <Image source={require('../assets/chat.png')} style={styles.chatIcon} />
       </TouchableOpacity>
+
+      {/* Loading Overlay for User Switching */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#2f8dd7" />
+          <Text style={styles.loadingText}>Switching user...</Text>
+        </View>
+      )}
+
+      {/* Custom Switch User Dialog */}
+      <Modal
+        visible={showSwitchUserDialog}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleDialogCancel}
+      >
+        <View style={styles.dialogOverlay}>
+          <View style={styles.dialogContainer}>
+            <Text style={styles.dialogTitle}>Select Student Profile</Text>
+
+            <View style={styles.userListContainer}>
+              {availableUsers.map((user, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.userButton}
+                  onPress={() => handleUserSelection(user)}
+                >
+                  <Text style={styles.userButtonText}>{user.fullName}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleDialogCancel}
+            >
+              <Text style={styles.cancelButtonText}>CANCEL</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -357,20 +639,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  menuDots: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 24,
-    height: 24,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2,
-    backgroundColor: '#FFFFFF',
-    marginVertical: 2,
-  },
+
   studentInfo: {
     backgroundColor: '#E8C547',
     flexDirection: 'row',
@@ -511,5 +780,69 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     resizeMode: 'contain',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: 'white',
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // Custom Dialog Styles
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dialogContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 30,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    minWidth: 280,
+    maxWidth: 350,
+  },
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#000000ff',
+  },
+  userListContainer: {
+    marginBottom: 10,
+  },
+  userButton: {
+    paddingVertical: 10,
+    width: '100%',
+  },
+  userButtonText: {
+    fontSize: 20,
+    color: '#333333',
+    textAlign: 'left',
+    // fontWeight: '400',
+  },
+  cancelButton: {
+    // backgroundColor: '#E0E0E0',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    width: '100%',
+    alignSelf: 'flex-end',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    color: '#4A90E2',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });

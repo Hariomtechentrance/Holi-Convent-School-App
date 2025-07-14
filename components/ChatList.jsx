@@ -47,8 +47,8 @@ export default function ChatList({ route, navigation }) {
             <Text style={styles.toText}>To,</Text>
             <Text style={styles.dateText}>{dateFormatChat(item.CREATED_TIMESTAMP)}</Text>
           </View>
-          <Text style={styles.listItemSubject}>{item.ROLE_NAME}</Text>
-          <Text style={styles.messageText}>{item.MESSAGE_SUB}</Text>
+          <Text style={styles.listItemSubject}>{item.ROLE_NAME || 'Class Teacher'}</Text>
+          <Text style={styles.messageText}>{item.MESSAGE_SUB || item.SUBJECT || 'No Subject'}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -89,6 +89,7 @@ export default function ChatList({ route, navigation }) {
       let chatList = await ApiHelper.callGetAPI(url);
 
       if (chatList.result && chatList.result.length > 0) {
+        console.log('Chat list received for status', status, ':', chatList.result);
         if (status === 'open') {
           setOpenedList(chatList.result);
         } else {
