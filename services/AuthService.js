@@ -2,10 +2,10 @@
 // Integrates with the real API endpoint and supports multi-user functionality
 
 import { StorageHelper } from '../helpers/StorageHelper';
-import { LOGIN_CURRENTUSER } from '../helpers/constants';
+import { LOGIN_CURRENTUSER, SCHOOL_CONNECT_API_HTTPS, SCHOOL_CONNECT_API_HTTP } from '../helpers/constants';
 
-const API_BASE_URL_HTTPS = 'https://pinnacleapp.in/SchoolConnect/rest/school/v1';
-const API_BASE_URL_HTTP = 'http://pinnacleapp.in/SchoolConnect/rest/school/v1';
+const API_BASE_URL_HTTPS = SCHOOL_CONNECT_API_HTTPS;
+const API_BASE_URL_HTTP = SCHOOL_CONNECT_API_HTTP;
 
 // Helper function to get current date in required format
 const getCurrentDateTime = () => {

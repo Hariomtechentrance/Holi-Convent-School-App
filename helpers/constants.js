@@ -1,10 +1,10 @@
 // Constants for Holy Cross Convent School App
 // Contains API endpoints, configuration, and common constants
 
-export const API_BASE = "http://pinnacleapp.in/";
-export const MOBILE_APP_API = API_BASE + "MobileApp/rest/";
-export const SCHOOL_CONNECT_APP_API = API_BASE + "SchoolConnect/rest/school/v1/";
-export const FEES_APP_API = API_BASE + "Fees/rest/fees/v1/";
+// Main API endpoints
+export const SCHOOL_CONNECT_API_HTTP = "http://pinnacleapp.in/SchoolConnect/rest/school/v1";
+export const SCHOOL_CONNECT_API_HTTPS = "https://pinnacleapp.in/SchoolConnect/rest/school/v1";
+export const FEES_APP_API = "http://pinnacleapp.in/Fees/rest/fees/v1/";
 export const PAYMENT_GATEWAY_API = "https://pinnacleeasebuzz.in/config";
 export const EPATHSHALA_FEES_URL = "https://epathshalainfo.com/FeesAkash/";
 export const EPATHSHALA_FEES_JSON_URL = "https://epathshalainfo.com/parentJson/";
@@ -29,13 +29,6 @@ export const NOTIFICATION_TYPES = {
 
 // Login constants
 export const LOGIN_CURRENTUSER = "currentUser";
-
-// Action constants for multi-user functionality
-// export const ACTION_LOGOUT = "logout";
-// export const ACTION_ADD_CHILD = "add_child";
-// export const ACTION_FILTER = "filter";
-// export const ACTION_REFRESH = "refresh";
-// export const ACTION_FILTER_WITH_REFRESH = "filter_with_refresh";
 
 // File types
 export const imageFileTypes = ["jpg", "jpeg", "bmp", "png", "gif", "webp", "tiff"];
@@ -79,11 +72,13 @@ export function decodeString(str) {
 }
 
 export default {
-  API_BASE,
-  MOBILE_APP_API,
-  SCHOOL_CONNECT_APP_API,
+  SCHOOL_CONNECT_API_HTTP,
+  SCHOOL_CONNECT_API_HTTPS,
   FEES_APP_API,
   PAYMENT_GATEWAY_API,
+  EPATHSHALA_FEES_URL,
+  EPATHSHALA_FEES_JSON_URL,
+  EPATHSHALA_FEES_IMAGE_URL,
   GATEWAY_SOURCE,
   NOTIFICATION_TYPES,
   imageFileTypes,

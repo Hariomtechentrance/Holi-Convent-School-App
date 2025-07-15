@@ -1,7 +1,6 @@
-// Content Service for Holy Cross Convent School App
 // Handles fetching and processing of student content (alerts, circulars, homework, moments)
 
-const API_BASE_URL = 'https://pinnacleapp.in/SchoolConnect/rest/school/v1';
+import { SCHOOL_CONNECT_API_HTTPS, SCHOOL_CONNECT_API_HTTP } from '../helpers/constants';
 
 // Helper function to get current date in required format
 const getCurrentDateTime = () => {
@@ -83,8 +82,8 @@ class ContentService {
   // API call helper with HTTPS/HTTP fallback
   static async makeApiCall(endpoint, payload) {
     const baseUrls = [
-      'https://pinnacleapp.in/SchoolConnect/rest/school/v1',
-      'http://pinnacleapp.in/SchoolConnect/rest/school/v1'
+      SCHOOL_CONNECT_API_HTTPS,
+      SCHOOL_CONNECT_API_HTTP
     ];
 
     for (let i = 0; i < baseUrls.length; i++) {
